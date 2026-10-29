@@ -1,141 +1,164 @@
 import json
-import random
-import math
-import numpy as np
+import tkinter as tk
+from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-def funcion_aptitud(x):
-    return x * math.sin(10 * math.pi * x) + 1.0
+# Importar los módulos desarrollados por tu equipo
+from operadores import AlgoritmoGenetico
+from utilidades import validacion_fuerza_bruta
 
-class AlgoritmoGenetico:
-    def __init__(self, config):
-        self.pop_size = config["tamano_poblacion"]
-        self.generations = config["numero_generaciones"]
-        self.p_cruce = config["probabilidad_cruce"]
-        self.p_mut = config["probabilidad_mutacion"]
-        self.low = config["limite_inferior"]
-        self.high = config["limite_superior"]
-        
-        if config.get("semilla_aleatoria") is not None:
-            random.seed(config["semilla_aleatoria"])
-            np.random.seed(config["semilla_aleatoria"])
+class AplicacionAG:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Optimización mediante Algoritmo Genético - Unidad 3")
+        self.root.geometry("1000x700")
+        self.root.resizable(True, True)
 
-    def crear_poblacion_inicial(self):
-        return [random.uniform(self.low, self.high) for _ in range(self.pop_size)]
+        # Cargar configuración inicial
+        self.config = self.cargar_configuracion()
 
-    def seleccion_torneo(self, poblacion, aptitudes, k=3):
-        seleccionados = random.sample(list(zip(poblacion, aptitudes)), k)
-        seleccionados.sort(key=lambda x: x[1], reverse=True)
-        return seleccionados[0][0]
+        # Configuración de estilos
+        style = ttk.Style()
+        style.theme_use("clam")
 
-    def cruce_aritmetico(self, padre1, padre2):
-        if random.random() < self.p_cruce:
-            alpha = random.random()
-            hijo1 = alpha * padre1 + (1 - alpha) * padre2
-            hijo2 = (1 - alpha) * padre1 + alpha * padre2
-            return hijo1, hijo2
-        return padre1, padre2
+        self.crear_interfaz()
 
-    def mutacion_gaussiana(self, individuo):
-        if random.random() < self.p_mut:
-            sigma = (self.high - self.low) * 0.1
-            individuo += random.gauss(0, sigma)
-            individuo = max(self.low, min(self.high, individuo))
-        return individuo
+    def cargar_configuracion(self):
+        try:
+            with open("config.json", "r") as f:
+                return json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar config.json: {e}")
+            return {
+                "tamano_poblacion": 100,
+                "numero_generaciones": 100,
+                "probabilidad_cruce": 0.8,
+                "probabilidad_mutacion": 0.05,
+                "semilla_aleatoria": 42,
+                "limite_inferior": -1.0,
+                "limite_superior": 2.0
+            }
 
-    def ejecutar(self):
-        poblacion = self.crear_poblacion_inicial()
-        historial_mejor_aptitud = []
-        mejor_global_ind = None
-        mejor_global_fit = float('-inf')
-
-        for gen in range(self.generations):
-            aptitudes = [funcion_aptitud(ind) for ind in poblacion]
-            
-            max_fit = max(aptitudes)
-            idx_max = aptitudes.index(max_fit)
-            historial_mejor_aptitud.append(max_fit)
-
-            if max_fit > mejor_global_fit:
-                mejor_global_fit = max_fit
-                mejor_global_ind = poblacion[idx_max]
-
-            nueva_poblacion = []
-            while len(nueva_poblacion) < self.pop_size:
-                p1 = self.seleccion_torneo(poblacion, aptitudes)
-                p2 = self.seleccion_torneo(poblacion, aptitudes)
-                h1, h2 = self.cruce_aritmetico(p1, p2)
-                nueva_poblacion.append(self.mutacion_gaussiana(h1))
-                if len(nueva_poblacion) < self.pop_size:
-                    nueva_poblacion.append(self.mutacion_gaussiana(h2))
-
-            poblacion = nueva_poblacion
-
-        return mejor_global_ind, mejor_global_fit, historial_mejor_aptitud
-
-def validacion_fuerza_bruta(low=-1.0, high=2.0, pasos=100000):
-    x_vals = np.linspace(low, high, pasos)
-    y_vals = x_vals * np.sin(10 * np.pi * x_vals) + 1.0
-    idx_max = np.argmax(y_vals)
-    return x_vals[idx_max], y_vals[idx_max]
-
-def graficar_convergencia(historial):
-    plt.figure(figsize=(8, 5))
-    plt.plot(historial, color='blue', linewidth=2, label='Mejor Aptitud')
-    plt.title('Gráfica de Convergencia del Algoritmo Genético')
-    plt.xlabel('Generación')
-    plt.ylabel('Aptitud (Fitness)')
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig('grafica_convergencia.png')
-    plt.show()
-
-def cargar_configuracion():
-    with open("config.json", "r") as f:
-        return json.load(f)
-
-def main():
-    config = cargar_configuracion()
-    
-    while True:
-        print("\n=== MENÚ INTERACTIVO - ALGORITMO GENÉTICO ===")
-        print(f"1. Ejecutar AG con config actual (Población: {config['tamano_poblacion']}, Gen: {config['numero_generaciones']})")
-        print("2. Modificar parámetros de configuración")
-        print("3. Validar con Fuerza Bruta (Óptimo Global)")
-        print("4. Salir")
-        
-        opcion = input("Seleccione una opción: ")
-
-        if opcion == "1":
-            ag = AlgoritmoGenetico(config)
-            mejor_ind, mejor_fit, historial = ag.ejecutar()
-            print("\n--- RESULTADOS DEL ALGORITMO GENÉTICO ---")
-            print(f"Mejor Individuo (x): {mejor_ind:.6f}")
-            print(f"Mejor Aptitud f(x): {mejor_fit:.6f}")
-            graficar_convergencia(historial)
-
-        elif opcion == "2":
-            config["tamano_poblacion"] = int(input("Nuevo tamaño de población: "))
-            config["numero_generaciones"] = int(input("Nuevo número de generaciones: "))
-            config["probabilidad_cruce"] = float(input("Probabilidad de cruce (0-1): "))
-            config["probabilidad_mutacion"] = float(input("Probabilidad de mutación (0-1): "))
+    def guardar_configuracion(self):
+        try:
+            self.config["tamano_poblacion"] = int(self.entries["tamano_poblacion"].get())
+            self.config["numero_generaciones"] = int(self.entries["numero_generaciones"].get())
+            self.config["probabilidad_cruce"] = float(self.entries["probabilidad_cruce"].get())
+            self.config["probabilidad_mutacion"] = float(self.entries["probabilidad_mutacion"].get())
             
             with open("config.json", "w") as f:
-                json.dump(config, f, indent=4)
-            print("¡Configuración guardada en config.json!")
+                json.dump(self.config, f, indent=4)
+            messagebox.showinfo("Éxito", "¡Configuración guardada correctamente en config.json!")
+        except ValueError:
+            messagebox.showerror("Error de Entrada", "Por favor ingresa valores numéricos válidos.")
 
-        elif opcion == "3":
-            x_opt, f_opt = validacion_fuerza_bruta()
-            print("\n--- VALIDACIÓN (BÚSQUEDA EXHAUSTIVA) ---")
-            print(f"Óptimo Teórico/Fuerza Bruta (x): {x_opt:.6f}")
-            print(f"Aptitud Máxima f(x): {f_opt:.6f}")
+    def crear_interfaz(self):
+        # Panel Superior: Título
+        frame_titulo = ttk.Frame(self.root, padding=10)
+        frame_titulo.pack(side=tk.TOP, fill=tk.X)
+        
+        lbl_titulo = ttk.Label(
+            frame_titulo, 
+            text="Algoritmo Genético: Maximización de f(x) = x · sin(10πx) + 1", 
+            font=("Helvetica", 14, "bold")
+        )
+        lbl_titulo.pack()
 
-        elif opcion == "4":
-            print("Saliendo del programa...")
-            break
-        else:
-            print("Opción inválida. Intente de nuevo.")
+        # Panel Izquierdo: Controles y Parámetros
+        frame_izq = ttk.LabelFrame(self.root, text=" Configuración de Parámetros ", padding=15)
+        frame_izq.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+
+        self.entries = {}
+        campos = [
+            ("Tamaño Población:", "tamano_poblacion"),
+            ("Número Generaciones:", "numero_generaciones"),
+            ("Prob. Cruce (0-1):", "probabilidad_cruce"),
+            ("Prob. Mutación (0-1):", "probabilidad_mutacion")
+        ]
+
+        for i, (label_text, key) in enumerate(campos):
+            lbl = ttk.Label(frame_izq, text=label_text, font=("Helvetica", 10))
+            lbl.grid(row=i, column=0, sticky=tk.W, pady=5)
+            
+            entry = ttk.Entry(frame_izq, width=12)
+            entry.insert(0, str(self.config.get(key, "")))
+            entry.grid(row=i, column=1, pady=5, padx=5)
+            self.entries[key] = entry
+
+        # Botones de Acción
+        btn_guardar = ttk.Button(frame_izq, text="💾 Guardar Configuración", command=self.guardar_configuracion)
+        btn_guardar.grid(row=4, column=0, columnspan=2, sticky=tk.EW, pady=8)
+
+        btn_ejecutar = ttk.Button(frame_izq, text="▶ Ejecutar Algoritmo Genético", command=self.ejecutar_ag)
+        btn_ejecutar.grid(row=5, column=0, columnspan=2, sticky=tk.EW, pady=5)
+
+        btn_validar = ttk.Button(frame_izq, text="🔍 Validar con Fuerza Bruta", command=self.ejecutar_validacion)
+        btn_validar.grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=5)
+
+        # Área de Reporte/Resultados
+        frame_resultados = ttk.LabelFrame(frame_izq, text=" Resultados ", padding=10)
+        frame_resultados.grid(row=7, column=0, columnspan=2, sticky=tk.NSEW, pady=15)
+
+        self.txt_resultados = tk.Text(frame_resultados, height=12, width=32, font=("Consolas", 9))
+        self.txt_resultados.pack(fill=tk.BOTH, expand=True)
+
+        # Panel Derecho: Gráfica de Convergencia
+        self.frame_derecho = ttk.LabelFrame(self.root, text=" Gráfica de Convergencia ", padding=10)
+        self.frame_derecho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.canvas = None
+
+    def ejecutar_ag(self):
+        # Actualizar parámetros internamente desde las entradas
+        try:
+            self.config["tamano_poblacion"] = int(self.entries["tamano_poblacion"].get())
+            self.config["numero_generaciones"] = int(self.entries["numero_generaciones"].get())
+            self.config["probabilidad_cruce"] = float(self.entries["probabilidad_cruce"].get())
+            self.config["probabilidad_mutacion"] = float(self.entries["probabilidad_mutacion"].get())
+        except ValueError:
+            messagebox.showerror("Error", "Revisa que los parámetros sean números válidos.")
+            return
+
+        ag = AlgoritmoGenetico(self.config)
+        mejor_ind, mejor_fit, historial = ag.ejecutar()
+
+        # Mostrar en el panel de texto
+        self.txt_resultados.delete("1.0", tk.END)
+        self.txt_resultados.insert(tk.END, "=== ALGORITMO GENÉTICO ===\n\n")
+        self.txt_resultados.insert(tk.END, f"• Mejor x: {mejor_ind:.6f}\n")
+        self.txt_resultados.insert(tk.END, f"• Mejor f(x): {mejor_fit:.6f}\n")
+        self.txt_resultados.insert(tk.END, f"• Generaciones: {len(historial)}\n")
+        self.txt_resultados.insert(tk.END, "\n¡Ejecución completada!")
+
+        # Mostrar gráfica incrustada
+        self.dibujar_grafica(historial)
+
+    def ejecutar_validacion(self):
+        x_opt, f_opt = validacion_fuerza_bruta()
+        
+        self.txt_resultados.insert(tk.END, "\n\n=== FUERZA BRUTA ===\n")
+        self.txt_resultados.insert(tk.END, f"• x óptimo: {x_opt:.6f}\n")
+        self.txt_resultados.insert(tk.END, f"• f(x) máx: {f_opt:.6f}\n")
+
+    def dibujar_grafica(self, historial):
+        if self.canvas:
+            self.canvas.get_tk_widget().destroy()
+
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
+        ax.plot(historial, color='#1f77b4', linewidth=2, label='Mejor Aptitud')
+        ax.set_title('Convergencia del Fitness vs Generación', fontsize=11, fontweight='bold')
+        ax.set_xlabel('Generación')
+        ax.set_ylabel('Aptitud f(x)')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.legend()
+        fig.tight_layout()
+
+        self.canvas = FigureCanvasTkAgg(fig, master=self.frame_derecho)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = AplicacionAG(root)
+    root.mainloop()
