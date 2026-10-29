@@ -1,0 +1,9 @@
+{
+  "tamano_poblacion": 100,
+  "numero_generaciones": 100,
+  "probabilidad_cruce": 0.8,
+  "probabilidad_mutacion": 0.05,
+  "semilla_aleatoria": 42,
+  "limite_inferior": -1.0,
+  "limite_superior": 2.0
+}
